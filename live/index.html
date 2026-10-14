@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATTACKER — Live</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#131822; --panel2:#0f141d; --line:#222b3a;
+    --ink:#e6edf3; --muted:#8aa0b4; --faint:#5b6b7d;
+    --blue:#4a9eff; --green:#3ad29f; --amber:#f5a623; --red:#ff5d5d; --violet:#b98cff;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px}
+  header{display:flex;align-items:center;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line);background:var(--panel2);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;letter-spacing:.5px}
+  header h1 b{color:var(--red)}
+  .sub{font-size:11px;color:var(--faint)}
+  .target{font-family:var(--mono);color:var(--muted);font-size:12px}
+  .spacer{flex:1}
+  .health{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--faint)}
+  .dot.up{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .dot.down{background:var(--red);box-shadow:0 0 8px var(--red)}
+  button{font-family:var(--sans);font-size:12.5px;font-weight:600;border:0;border-radius:7px;padding:8px 14px;cursor:pointer}
+  .btn-go{color:#071019;background:var(--green)}
+  .btn-sec{color:var(--ink);background:#1b2330;border:1px solid var(--line)}
+  button:disabled{opacity:.45;cursor:default}
+  .elapsed{font-family:var(--mono);font-size:12px;color:var(--faint)}
+
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+  .ba .card{background:var(--panel2);padding:11px 16px}
+  .ba .t{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);margin-bottom:5px}
+  .ba .big{font-family:var(--mono);font-size:13px}
+  .ba .before .big{color:var(--green)}
+  .ba .after .big{color:var(--red)}
+  .ba .muted{color:var(--muted)}
+
+  .tally{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+  .tile{background:var(--panel2);padding:12px 16px}
+  .tile .n{font-family:var(--mono);font-size:22px;font-weight:700}
+  .tile .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:3px}
+  .tile.red .n{color:var(--red)} .tile.amber .n{color:var(--amber)}
+  .tile.blue .n{color:var(--blue)} .tile.violet .n{color:var(--violet)}
+
+  main{display:grid;grid-template-columns:1.1fr 1fr;gap:14px;padding:14px;align-items:start}
+  @media(max-width:880px){main{grid-template-columns:1fr}.tally{grid-template-columns:repeat(3,1fr)}.ba{grid-template-columns:1fr}}
+  .col h2{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin:0 0 8px 2px;display:flex;justify-content:space-between;align-items:center}
+
+  .atk{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:11px 13px;margin-bottom:9px}
+  .atk.active{border-color:var(--amber)}
+  .atk.success{border-color:var(--red)} .atk.partial{border-color:var(--blue)}
+  .atk-top{display:flex;align-items:center;gap:9px}
+  .badge{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--faint)}
+  .atk-name{font-weight:600}
+  .tech{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .status{margin-left:auto;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;background:#1b2330;color:var(--muted)}
+  .status.active{background:#3a2e12;color:var(--amber)}
+  .status.success{background:#3a1616;color:var(--red)}
+  .status.partial{background:#13283a;color:var(--blue)}
+  .status.error{background:#2a2a2a;color:var(--faint)}
+  .atk-sum{font-size:12px;color:var(--muted);margin-top:6px;min-height:14px}
+  .atk-m{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:4px}
+  .atk-dmg{font-size:11.5px;color:var(--red);margin-top:6px;display:none}
+  .atk.success .atk-dmg,.atk.partial .atk-dmg{display:block}
+
+  .feedwrap{background:var(--panel);border:1px solid var(--line);border-radius:9px;height:calc(100vh - 300px);min-height:300px;overflow:auto}
+  .feed{font-family:var(--mono);font-size:12px;line-height:1.55;padding:10px 12px}
+  .row{display:flex;gap:8px;padding:1px 0;white-space:pre-wrap;word-break:break-word}
+  .row .tc{color:var(--faint);flex:0 0 auto}
+  .row.request .msg{color:var(--muted)} .row.info .msg{color:var(--blue)}
+  .row.hit .msg{color:var(--amber)} .row.creds .msg{color:var(--red);font-weight:600}
+  .row .det{color:var(--faint)}
+
+  .loot{background:var(--panel);border:1px solid var(--red);border-radius:9px;margin-top:12px;display:none}
+  .loot h3{margin:0;padding:9px 12px;font-size:12px;color:var(--red);border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.6px}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px}
+  td{padding:5px 12px;border-bottom:1px solid var(--panel2);color:var(--ink)}
+  td.pw{color:var(--amber)}
+
+  .hist{margin:0 14px 18px}
+  .hist .items{display:flex;flex-direction:column;gap:6px}
+  .hitem{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px}
+  .hitem .rid{font-family:var(--mono);color:var(--muted)}
+  .hitem .tags{color:var(--faint);flex:1}
+  .hitem .mode{font-size:10px;text-transform:uppercase;padding:1px 7px;border-radius:12px;background:#1b2330;color:var(--muted)}
+  .hitem.saved{border-color:#5a4a1a}
+  .hitem .hbtn{padding:4px 10px;font-size:11px}
+  .hitem .star{padding:4px 10px;font-size:11px;border:1px solid var(--line);border-radius:7px;background:#1b2330;color:var(--muted);cursor:pointer;font-weight:600}
+  .hitem .star.on{color:var(--amber);border-color:#5a4a1a;background:#2a230f}
+  .hitem .del{color:var(--red)}
+  .hint{color:var(--faint);font-size:12px;padding:14px;text-align:center}
+
+  .overlay{position:fixed;inset:0;background:rgba(3,6,11,.7);display:none;align-items:center;justify-content:center;z-index:20}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:11px;max-width:860px;width:92%;max-height:84vh;overflow:auto;padding:18px}
+  .modal h3{margin:0 0 4px} .modal .close{float:right}
+  .modal table td{font-size:11px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1><b>ATTACKER</b> · live attack console</h1>
+    <div class="sub" id="legend">11 attacks · 7 techniques — brute force · password spray · port scan · SQL injection · data exfiltration · impossible travel · prompt injection</div>
+  </div>
+  <span class="target" id="target">—</span>
+  <div class="spacer"></div>
+  <div class="health"><span class="dot" id="hdot"></span><span id="hlabel">target unknown</span></div>
+  <span class="elapsed" id="elapsed"></span>
+  <button class="btn-sec" id="baseline">⦿ Scan baseline</button>
+  <button class="btn-go" id="start">▶ Launch attacks</button>
+  <button class="btn-sec" id="clear" title="Deletes unsaved live runs; saved (★) runs are kept">🗑 Clear unsaved</button>
+</header>
+
+<div class="ba">
+  <div class="card before"><div class="t">Before · baseline scan</div><div class="big" id="ba_before">No baseline yet — click “Scan baseline” (or run ./baseline.sh).</div></div>
+  <div class="card after"><div class="t">After · latest attack run</div><div class="big" id="ba_after">No attack run yet.</div></div>
+</div>
+
+<div class="tally">
+  <div class="tile red"><div class="n" id="t_comp">0</div><div class="l">Compromises</div></div>
+  <div class="tile red"><div class="n" id="t_loot">0</div><div class="l">Records stolen</div></div>
+  <div class="tile amber"><div class="n" id="t_fail">0</div><div class="l">Failed logins</div></div>
+  <div class="tile blue"><div class="n" id="t_ports">0</div><div class="l">Ports probed</div></div>
+  <div class="tile violet"><div class="n" id="t_exfil">0 B</div><div class="l">Exfiltrated</div></div>
+  <div class="tile amber"><div class="n" id="t_inj">0</div><div class="l">Injections</div></div>
+</div>
+
+<main>
+  <div class="col">
+    <h2>Attacks</h2>
+    <div id="atks"></div>
+    <div class="loot" id="loot">
+      <h3>Stolen credentials (live from SQL injection)</h3>
+      <table id="loottbl"></table>
+    </div>
+  </div>
+  <div class="col">
+    <h2>Live activity</h2>
+    <div class="feedwrap"><div class="feed" id="feed">
+      <div class="hint" id="hint">Connected. Launch attacks here, or run <b>./attack.sh</b> in a separate terminal — this console updates live and keeps the results after you refresh or restart.</div>
+    </div></div>
+  </div>
+</main>
+
+<div class="hist col">
+  <h2>History <button class="btn-sec" id="refreshhist" style="padding:3px 9px;font-size:11px">refresh</button></h2>
+  <div class="items" id="histitems"><div class="hint">No past runs.</div></div>
+</div>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const cards={}; const loot=new Map(); let totals={}; let startTs=null,endTs=null,timer=null;
+
+function fmtBytes(n){const u=["B","KB","MB","GB"];let i=0;while(n>=1024&&i<3){n/=1024;i++}return (i?n.toFixed(1):n)+" "+u[i];}
+function hhmmss(ms){const s=Math.max(0,Math.floor(ms/1000));return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+
+function reset(){
+  $("atks").innerHTML="";for(const k in cards)delete cards[k];
+  loot.clear();$("loottbl").innerHTML="";$("loot").style.display="none";
+  $("feed").innerHTML="";totals={};setTotals({});
+  $("ba_after").textContent="Attack running…";
+  startTs=null;endTs=null;if(timer){clearInterval(timer);timer=null;}
+}
+
+function ensureCard(ev){
+  if(cards[ev.id])return cards[ev.id];
+  const el=document.createElement("div");el.className="atk";el.id="atk_"+ev.id;
+  el.innerHTML=`<div class="atk-top"><span class="badge">${ev.id}</span>
+    <span class="atk-name"></span><span class="tech"></span>
+    <span class="status">queued</span></div>
+    <div class="atk-sum"></div><div class="atk-m"></div><div class="atk-dmg"></div>`;
+  $("atks").appendChild(el);
+  cards[ev.id]={el,name:el.querySelector(".atk-name"),tech:el.querySelector(".tech"),
+    status:el.querySelector(".status"),sum:el.querySelector(".atk-sum"),
+    m:el.querySelector(".atk-m"),dmg:el.querySelector(".atk-dmg")};
+  return cards[ev.id];
+}
+
+function feed(ev){
+  const h=$("hint"); if(h)h.remove();
+  const f=$("feed");
+  const r=document.createElement("div");r.className="row "+(ev.kind||"info");
+  const t=new Date(ev.ts).toLocaleTimeString();
+  r.innerHTML=`<span class="tc">${t} ${ev.id||""}</span><span class="msg"></span>`+
+    (ev.detail?`<span class="det">— ${esc(ev.detail)}</span>`:"");
+  r.querySelector(".msg").textContent=ev.msg;
+  f.appendChild(r);
+  const w=f.parentElement; w.scrollTop=w.scrollHeight;
+  while(f.children.length>800)f.removeChild(f.firstChild);
+}
+
+function metricLine(m){
+  const p=[];
+  if(m.ports_probed!=null)p.push(`${m.ports_probed} probed / ${m.ports_open||0} open`);
+  if(m.requests!=null)p.push(`${m.requests} requests`);
+  if(m.failed_logins!=null)p.push(`${m.failed_logins} failed`);
+  if(m.accounts!=null)p.push(`${m.accounts} accounts`);
+  if(m.records_stolen)p.push(`${m.records_stolen} records stolen`);
+  if(m.bytes!=null)p.push(`${fmtBytes(m.bytes)}`);
+  if(m.payloads!=null)p.push(`${m.payloads} payloads, ${m.refused||0} refused`);
+  if(m.locations!=null)p.push(`${m.successful_logins||0}/${m.locations} logins`);
+  return p.join("  ·  ");
+}
+
+function setTotals(t){
+  $("t_comp").textContent=t.compromises||0;
+  $("t_loot").textContent=t.records_stolen||0;
+  $("t_fail").textContent=t.failed_logins||0;
+  $("t_ports").textContent=t.ports||0;
+  $("t_exfil").textContent=fmtBytes(t.exfil_bytes||0);
+  $("t_inj").textContent=t.injections||0;
+}
+
+function renderBaseline(b){
+  if(!b||!b.ts){return;}
+  $("ba_before").innerHTML=`target <span class="muted">${esc(b.target)}</span> · `+
+    `health <b style="color:var(--green)">${(b.health||"?").toUpperCase()}</b> · `+
+    `${(b.open_ports||[]).length}/${b.ports_scanned||0} ports open `+
+    `<span class="muted">[${(b.open_ports||[]).join(", ")}]</span> · 0 compromises`;
+}
+function renderAfter(){
+  const t=totals;
+  if(!t||!Object.keys(t).length){return;}
+  $("ba_after").innerHTML=`<b style="color:var(--red)">${t.compromises||0}</b> compromises · `+
+    `<b style="color:var(--red)">${t.records_stolen||0}</b> records stolen · `+
+    `${fmtBytes(t.exfil_bytes||0)} exfiltrated · ${t.ports||0} ports probed`;
+}
+
+function addLoot(rows){
+  (rows||[]).forEach(r=>{loot.set(r.email+"|"+r.password,r);});
+  const tbl=$("loottbl");tbl.innerHTML="";
+  loot.forEach(r=>{const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${esc(r.email)}</td><td class="pw">${esc(r.password)}</td>`;tbl.appendChild(tr);});
+  if(loot.size)$("loot").style.display="block";
+}
+
+function startClock(){
+  if(timer)clearInterval(timer);
+  timer=setInterval(()=>{const end=endTs||Date.now();$("elapsed").textContent=hhmmss(end-(startTs||end));},500);
+}
+
+function handle(ev){
+  switch(ev.type){
+    case "reload":reset();break;
+    case "run_start":
+      $("target").textContent=ev.target;startTs=new Date(ev.ts).getTime();endTs=null;startClock();
+      if(ev.baseline)renderBaseline(ev.baseline);
+      $("start").disabled=true;$("start").textContent="running…";
+      break;
+    case "baseline_done":renderBaseline(ev.baseline);break;
+    case "health":{const d=$("hdot"),l=$("hlabel");
+      d.className="dot "+(ev.status==="up"?"up":"down");
+      l.textContent=ev.status==="up"?`target up · HTTP ${ev.code} · ${ev.latency_ms}ms`:`target down (HTTP ${ev.code})`;break;}
+    case "tc_start":{const c=ensureCard(ev);
+      c.name.textContent=ev.name;c.tech.textContent=`${ev.technique} · ${ev.tool}`;
+      c.status.textContent="running";c.status.className="status active";
+      c.el.className="atk active";c.sum.textContent="…";
+      feed({ts:ev.ts,id:ev.id,kind:"info",msg:`▶ ${ev.name} — ${ev.tool} → ${ev.target}`});break;}
+    case "activity":feed(ev);break;
+    case "metric":{const c=ensureCard(ev);c.m.textContent=metricLine(ev.metrics||{});break;}
+    case "tc_end":{const c=ensureCard(ev);
+      c.status.textContent=ev.status;c.status.className="status "+ev.status;
+      c.el.className="atk "+ev.status;c.sum.textContent=ev.summary;
+      if(ev.damage)c.dmg.textContent="⚠ "+ev.damage;
+      feed({ts:ev.ts,id:ev.id,kind:ev.status==="success"?"creds":"info",
+            msg:`■ ${ev.id} ${(ev.status||"").toUpperCase()} — ${ev.summary}`});break;}
+    case "totals":totals=ev.totals||{};setTotals(totals);renderAfter();break;
+    case "loot":addLoot(ev.rows);break;
+    case "warning":feed({ts:ev.ts,kind:"hit",msg:"⚠ "+ev.msg});break;
+    case "run_end":endTs=new Date(ev.ts).getTime();totals=ev.totals||totals;
+      setTotals(totals);renderAfter();
+      feed({ts:ev.ts,kind:"info",msg:`✔ Run complete — report: ${ev.report_path}`});
+      $("start").disabled=false;$("start").textContent="▶ Re-run attacks";loadHistory();break;
+  }
+}
+
+// ---- REST: baseline, history, modal ---------------------------------------
+async function loadBaseline(){try{const b=await(await fetch("/api/baseline")).json();renderBaseline(b);}catch(e){}}
+async function loadHistory(){
+  try{const d=await(await fetch("/api/runs")).json();const box=$("histitems");
+    if(!d.runs||!d.runs.length){box.innerHTML='<div class="hint">No past runs.</div>';return;}
+    box.innerHTML="";
+    d.runs.forEach(r=>{const t=r.totals||{};const el=document.createElement("div");
+      el.className="hitem"+(r.saved?" saved":"");
+      const when=r.started?new Date(r.started).toLocaleString():"";
+      el.innerHTML=`<span class="mode">${r.mode||"?"}</span>
+        <span class="rid">${r.run_id}</span>
+        <span class="tags">${when} — ${t.compromises||0} comp · ${t.records_stolen||0} stolen · ${fmtBytes(t.exfil_bytes||0)}</span>
+        <button class="star ${r.saved?"on":""}" title="${r.saved?"Saved — won't be cleared":"Save to keep"}">${r.saved?"★ saved":"☆ save"}</button>
+        <button class="btn-sec hbtn">View</button>
+        <button class="btn-sec hbtn del" title="Delete this run">🗑</button>`;
+      el.querySelector(".star").onclick=async()=>{await fetch(`/api/run/save?id=${encodeURIComponent(r.run_id)}&saved=${r.saved?0:1}`,{method:"POST"});loadHistory();};
+      el.querySelector(".hbtn:not(.del)").onclick=()=>viewRun(r.run_id);
+      el.querySelector(".del").onclick=async()=>{if(!confirm(`Delete run ${r.run_id}? This removes its saved results.`))return;await fetch(`/api/run/delete?id=${encodeURIComponent(r.run_id)}`,{method:"POST"});loadHistory();};
+      box.appendChild(el);});
+  }catch(e){}
+}
+async function viewRun(id){
+  const d=await(await fetch("/api/run?id="+encodeURIComponent(id))).json();
+  const rep=d.report||{};const t=(rep.totals)||(d.meta&&d.meta.totals)||{};
+  const lootRows=[];(d.events||[]).forEach(e=>{if(e.type==="loot")(e.rows||[]).forEach(r=>lootRows.push(r));});
+  const uniq=new Map();lootRows.forEach(r=>uniq.set(r.email+"|"+r.password,r));
+  let html=`<button class="btn-sec close" onclick="document.getElementById('overlay').style.display='none'">close</button>
+    <h3>${id}</h3><div class="sub">${esc(rep.target||(d.meta&&d.meta.target)||"")} · ${rep.mode||(d.meta&&d.meta.mode)||""}</div>
+    <p style="color:var(--muted);font-size:12px">${t.compromises||0} compromises · ${t.records_stolen||0} records stolen · ${fmtBytes(t.exfil_bytes||0)} exfiltrated · ${t.ports||0} ports probed · ${t.injections||0} injections</p>`;
+  if(rep.attacks&&rep.attacks.length){
+    html+='<table><tr><td><b>TC</b></td><td><b>Attack</b></td><td><b>What happened</b></td><td><b>Result</b></td></tr>';
+    rep.attacks.forEach(a=>{html+=`<tr><td>${a.id}</td><td>${esc(a.name)}</td><td>${esc(a.what_happened)}</td><td>${esc(a.result_damage)}</td></tr>`;});
+    html+='</table>';
+  }
+  if(uniq.size){html+=`<h3 style="margin-top:14px;color:var(--red);font-size:13px">Stolen credentials (${uniq.size})</h3><table>`;
+    uniq.forEach(r=>{html+=`<tr><td>${esc(r.email)}</td><td class="pw">${esc(r.password)}</td></tr>`;});html+='</table>';}
+  $("modal").innerHTML=html;$("overlay").style.display="flex";
+}
+
+// ---- buttons --------------------------------------------------------------
+$("start").onclick=async()=>{reset();$("start").disabled=true;$("start").textContent="running…";await fetch("/start",{method:"POST"});};
+$("baseline").onclick=async()=>{$("ba_before").textContent="Scanning…";await fetch("/api/baseline",{method:"POST"});
+  for(let i=0;i<8;i++){await new Promise(r=>setTimeout(r,1200));await loadBaseline();}};
+$("clear").onclick=async()=>{if(!confirm("Clear all UNSAVED live runs? Runs you marked ★ saved are kept."))return;
+  await fetch("/api/clear",{method:"POST"});loadHistory();};
+$("refreshhist").onclick=loadHistory;
+$("overlay").onclick=e=>{if(e.target.id==="overlay")$("overlay").style.display="none";};
+
+// ---- boot -----------------------------------------------------------------
+loadBaseline();loadHistory();
+const es=new EventSource("/events");
+es.onmessage=e=>{try{handle(JSON.parse(e.data));}catch(err){}};
+</script>
+</body>
+</html>

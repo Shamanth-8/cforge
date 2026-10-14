@@ -1,0 +1,200 @@
+{
+  "run_defaults": {
+    "lab_subnet": "192.168.56.0/24",
+    "ssh_host": "192.168.56.10",
+    "juice_shop_host": "192.168.56.20",
+    "dvwa_host": "192.168.56.21",
+    "benign_sources": ["192.168.56.50", "192.168.56.51", "192.168.56.52"]
+  },
+  "test_cases": [
+    {
+      "id": "TC-01",
+      "impact": "Root account compromised after sustained brute force. Host is treated as breached; attacker gains an interactive shell.",
+      "technique": "T1110.001",
+      "name": "SSH brute force",
+      "tool": "Hydra",
+      "tool_version": "9.4",
+      "target": "ssh_host",
+      "generator": "ssh_bruteforce",
+      "offset_s": 0,
+      "window_s": 120,
+      "source_ips": ["192.168.56.100"],
+      "params": {"user": "root", "dst": "192.168.56.10", "dport": 22, "attempts": 34, "success": true},
+      "expected_signals": [
+        "repeated_failed_logins_from_single_source",
+        "account_compromise_attempt"
+      ]
+    },
+    {
+      "id": "TC-02",
+      "impact": "Valid vs. invalid accounts enumerated via low-rate spray; no lockout tripped. Attacker holds a map of live accounts for follow-on attacks.",
+      "technique": "T1110.003",
+      "name": "Password spraying",
+      "tool": "Hydra",
+      "tool_version": "9.4",
+      "target": "ssh_host",
+      "generator": "password_spray",
+      "offset_s": 300,
+      "window_s": 180,
+      "source_ips": ["192.168.56.101"],
+      "params": {"dst": "192.168.56.10", "dport": 22, "accounts": 16, "attempts_each": 2},
+      "expected_signals": [
+        "low_attempts_across_many_accounts_from_single_source"
+      ]
+    },
+    {
+      "id": "TC-03",
+      "impact": "Full service/port map of the host disclosed. Attack surface enumerated for targeted exploitation.",
+      "technique": "T1046",
+      "name": "Port scan",
+      "tool": "Nmap",
+      "tool_version": "7.94",
+      "target": "ssh_host",
+      "generator": "port_scan",
+      "offset_s": 600,
+      "window_s": 60,
+      "source_ips": ["192.168.56.102"],
+      "params": {"dst": "192.168.56.10", "ports": 220},
+      "expected_signals": [
+        "many_distinct_ports_from_single_source"
+      ]
+    },
+    {
+      "id": "TC-04",
+      "impact": "Injectable parameters confirmed on the web app; user and credential tables made readable. Data confidentiality lost.",
+      "technique": "T1190",
+      "name": "SQL injection",
+      "tool": "sqlmap",
+      "tool_version": "1.7",
+      "target": "juice_shop",
+      "generator": "sqli",
+      "offset_s": 900,
+      "window_s": 150,
+      "source_ips": ["192.168.56.103"],
+      "params": {"dst": "192.168.56.20", "dport": 3000, "encoded": false, "requests": 40},
+      "expected_signals": [
+        "sql_injection_patterns_in_request_parameters"
+      ]
+    },
+    {
+      "id": "TC-05",
+      "impact": "Roughly 500 MB exfiltrated in a single bulk transfer to an external host. Confirmed data loss.",
+      "technique": "T1048",
+      "name": "Data exfiltration",
+      "tool": "Caldera",
+      "tool_version": "5.0",
+      "target": "ssh_host",
+      "generator": "exfil",
+      "offset_s": 1200,
+      "window_s": 120,
+      "source_ips": ["192.168.56.10"],
+      "params": {"dst": "203.0.113.50", "dport": 443, "total_bytes": 524288000, "slow": false},
+      "expected_signals": [
+        "large_outbound_data_transfer"
+      ]
+    },
+    {
+      "id": "TC-06",
+      "impact": "Admin session active from two far-apart locations within minutes. Account integrity lost; credentials presumed stolen.",
+      "technique": "T1078",
+      "name": "Impossible travel",
+      "tool": "Caldera",
+      "tool_version": "5.0",
+      "target": "juice_shop",
+      "generator": "impossible_travel",
+      "offset_s": 1500,
+      "window_s": 90,
+      "source_ips": ["198.51.100.23", "203.0.113.77"],
+      "params": {"user": "admin", "dst": "192.168.56.20", "dport": 3000},
+      "expected_signals": [
+        "same_account_distant_locations_impossible_time"
+      ]
+    },
+    {
+      "id": "TC-07",
+      "impact": "Prompt handler probed with direct injection payloads. Canned refusal held, but the attempt surface is now exercised and logged.",
+      "technique": "PROMPT-INJECTION",
+      "name": "Prompt injection",
+      "tool": "Python script",
+      "tool_version": "1.0",
+      "target": "prompt_handler",
+      "generator": "prompt_injection",
+      "offset_s": 1800,
+      "window_s": 60,
+      "source_ips": ["192.168.56.104"],
+      "params": {"dst": "192.168.56.20", "dport": 8080, "paraphrased": false},
+      "expected_signals": [
+        "prompt_injection_payloads",
+        "handler_canned_response"
+      ]
+    },
+    {
+      "id": "TC-08",
+      "impact": "Signature/WAF evasion via encoding and inline comments achieved. Same database exposure as TC-04 through an obfuscated path.",
+      "technique": "T1190",
+      "name": "Encoded SQL injection",
+      "tool": "sqlmap + tamper",
+      "tool_version": "1.7",
+      "target": "juice_shop",
+      "generator": "sqli",
+      "offset_s": 2100,
+      "window_s": 150,
+      "source_ips": ["192.168.56.105"],
+      "params": {"dst": "192.168.56.20", "dport": 3000, "encoded": true, "requests": 40},
+      "expected_signals": [
+        "sql_injection_patterns_obfuscated_encoding_hex"
+      ]
+    },
+    {
+      "id": "TC-09",
+      "impact": "Paraphrased injection evaded keyword filters. Intent identical to TC-07; naive keyword defenses shown to be insufficient.",
+      "technique": "PROMPT-INJECTION",
+      "name": "Paraphrased prompt injection",
+      "tool": "Python script",
+      "tool_version": "1.0",
+      "target": "prompt_handler",
+      "generator": "prompt_injection",
+      "offset_s": 2400,
+      "window_s": 60,
+      "source_ips": ["192.168.56.106"],
+      "params": {"dst": "192.168.56.20", "dport": 8080, "paraphrased": true},
+      "expected_signals": [
+        "rephrased_injection_same_intent"
+      ]
+    },
+    {
+      "id": "TC-10",
+      "impact": "Host fully mapped while staying under rate thresholds. Stealth reconnaissance succeeded without tripping volume alarms.",
+      "technique": "T1046",
+      "name": "Slow port scan",
+      "tool": "Nmap",
+      "tool_version": "7.94",
+      "target": "ssh_host",
+      "generator": "port_scan",
+      "offset_s": 2700,
+      "window_s": 10800,
+      "source_ips": ["192.168.56.107"],
+      "params": {"dst": "192.168.56.10", "ports": 60, "slow": true},
+      "expected_signals": [
+        "few_ports_per_window_evades_threshold"
+      ]
+    },
+    {
+      "id": "TC-11",
+      "impact": "Roughly 480 MB exfiltrated in small chunks over hours. Data loss hidden below per-transfer volume alarms.",
+      "technique": "T1048",
+      "name": "Low-and-slow exfiltration",
+      "tool": "Caldera",
+      "tool_version": "5.0",
+      "target": "ssh_host",
+      "generator": "exfil",
+      "offset_s": 2850,
+      "window_s": 21600,
+      "source_ips": ["192.168.56.10"],
+      "params": {"dst": "203.0.113.50", "dport": 443, "total_bytes": 503316480, "slow": true, "chunks": 120},
+      "expected_signals": [
+        "data_exfiltration_spread_over_hours"
+      ]
+    }
+  ]
+}
